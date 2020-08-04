@@ -1,0 +1,635 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>分割球球</title>
+
+</head>
+    <script src="../js/pixi.min.js" ></script>
+<style>* {padding: 0; margin: 0}</style>
+
+
+<audio src="http://www.170mv.com/kw/sd.sycdn.kuwo.cn/resource/n3/0/26/3551379925.mp3
+" id="audios" hidden="true" autoplay="true" loop="true"  >
+      </audio>
+<body>
+
+  <script type="text/javascript">
+
+
+var Vector2 = function(x, y) {
+
+  this.x = x;
+  this.y = y;
+
+}
+
+Vector2.prototype = {
+
+    add : function(v) {
+
+        return new Vector2(this.x + v.x, this.y + v.y);
+
+    },
+
+    subtract : function(v) {
+
+        return new Vector2(this.x - v.x, this.y - v.y);
+
+    },
+
+    dot : function(v) { 
+        
+        return this.x * v.x + this.y * v.y; 
+    
+    },
+
+    cross : function(v) { 
+      
+        return this.x * v.y - this.y * v.x; 
+    
+    },
+
+}
+
+var app = new PIXI.Application({width: 580, height: 580});
+document.body.appendChild(app.view);
+
+var boxSize = 26;
+var heightNum = Math.floor(window.innerHeight / boxSize)+1;
+var widthNum  = Math.floor(window.innerWidth  / boxSize)+1;
+
+var box = new Array();
+for(var x1 = 0; x1 < widthNum; x1++) {
+  
+    box[x1] = new Array();
+
+}
+
+var sphere = new Array();
+var borders= new Array();
+var boxGraphics = new Array();//存放一个图（用于清空面积以及胜负判断）
+boxGraphics[0] = 0;//0号位置用来存放图中结点个数
+var graphicsListNode = function() {
+
+    this.next = null;
+    this.num  = 0;
+
+}
+
+var graphicsNode = function(num, coordinate) {
+
+    this.listNext = new graphicsListNode();
+    this.num      = num;
+    this.coordinate = coordinate;
+}
+
+function initBoxGraphics(boxGraphics) {
+
+    var temp;
+    temp = new graphicsNode(1, new Vector2(0, 0));
+    boxGraphics.push(temp);
+    
+    temp = new graphicsNode(2, new Vector2(widthNum-1, 0));
+    boxGraphics.push(temp);
+
+    temp = new graphicsNode(3, new Vector2(widthNum-1, heightNum-1));
+    boxGraphics.push(temp);
+
+    temp = new graphicsNode(4, new Vector2(0, heightNum-1));
+    boxGraphics.push(temp);
+    boxGraphics[0]+=4;
+
+    for(var i = 1; i <= boxGraphics[0]; i++) {
+
+        for(var j = 1; j <= 4; j++) {
+
+            if(i != j) {
+              var node = new graphicsListNode();
+              node.num = j;
+              insertNode(boxGraphics[i].listNext, node);  
+            }
+
+        }
+        
+
+    }
+
+
+
+}
+
+function insertNode(head, node) {
+
+    node.next = head.next;
+    head.next = node;
+
+}
+
+function createSphere() {
+
+    var length = sphere.length;
+    sphere[length] = new PIXI.Graphics();
+
+    var radius = 11;//Math.random()*20+15;
+    sphere[length].beginFill(0x9966FF*Math.random()*100);
+    sphere[length].drawCircle(0, 0, radius);
+    sphere[length].endFill();
+    sphere[length].x = Math.random()*400+50;
+    sphere[length].y = Math.random()*400+50;
+    sphere[length].r = radius;
+    sphere[length].cx = 3.5;
+    sphere[length].cy = 3.5;
+
+    app.stage.addChild(sphere[length]);
+
+}
+
+var controlPoint = function() {
+
+    this.position = 0;
+    this.P1       = 0;
+    this.P2       = 0;
+    this.direction= "horizontal";
+    this.ifBeBreak = true;
+
+}
+
+var boxAttribute = function(A, B, C, D) {
+
+    this.A = A;
+    this.B = B;
+    this.C = C;
+    this.D = D;
+    this.O = new Vector2(A.x+0.5*boxSize, A.y+0.5*boxSize);
+    this.border   = 0;
+    this.OA = 0;
+    this.OB = 0;
+    this.OC = 0;
+    this.OD = 0;
+
+}
+
+boxAttribute.prototype = {
+
+    initLizeBoxVector : function() {
+
+        this.OA = this.A.subtract(this.O);
+        this.OB = this.B.subtract(this.O);
+        this.OC = this.C.subtract(this.O);
+        this.OD = this.D.subtract(this.O);
+
+    }
+
+}
+
+
+
+function initBox(boxSize, box) {
+
+    var l1=0;
+    var l2=0;
+    for(var k1 = 0; k1 < window.innerWidth; k1 += boxSize){
+
+        for(var k2 = 0; k2 < window.innerHeight; k2 += boxSize){
+
+            box[l1][l2] = new PIXI.Graphics();
+            drawBox(box[l1][l2],0xDBDBDB,0x66CCFF);
+            box[l1][l2].x = k1;
+            box[l1][l2].y = k2;
+            box[l1][l2].attribute = new boxAttribute(new Vector2(k1,k2), new Vector2(k1+boxSize,k2), new Vector2(k1+boxSize,k2+boxSize),new Vector2(k1,k2+boxSize));
+             box[l1][l2].attribute.border = 1;
+             box[l1][l2].attribute.initLizeBoxVector();
+
+            app.stage.addChild(box[l1][l2]);
+            l2++;
+
+        }
+        l2=0;
+        l1++;
+
+    }
+
+}
+
+function createOriginalBorder(box) {
+
+    var y2 = heightNum - 1;
+    var x2 = 0;
+
+    for(var i = 0; i <= y2; i++) {       //左边界
+
+        drawBox(box[0][i],0x66CCFF,0x999999);
+        box[0][i].attribute.border = 0;
+
+    }
+
+  
+    var y3 = heightNum - 1;
+    var x3 = widthNum  - 1;
+
+    for(var i = 0; i <= y3; i++) {        //右边界
+
+        drawBox(box[x3][i],0x66CCFF,0x999999);
+        box[x3][i].attribute.border = 0;
+
+    }
+
+    var y4 = 0;
+    var x4 = widthNum - 1;
+
+    for(var i = 0; i <= x4; i++) {         //上边界
+
+        drawBox(box[i][0],0x66CCFF,0x999999);
+        box[i][0].attribute.border = 0;
+
+    }
+
+    var y5 = heightNum - 1;
+    var x5 = widthNum - 1;
+
+    for(var i = 0; i <= x5; i++) {        //下边界
+
+        drawBox(box[i][y5],0x66CCFF,0x999999);
+        box[i][y5].attribute.border = 0; 
+
+    }
+
+}
+
+function drawBox(box, lineColor, boxColor) {
+
+    box.lineStyle(2, lineColor, 1);
+    box.beginFill(boxColor); 
+    box.drawRect(0, 0, boxSize, boxSize);
+    box.endFill(); 
+
+}
+
+function testIndexOut(i, j) {    //判断数组是否发生溢出
+   
+    if(i<0||i>=widthNum||j<0||j>=heightNum) {
+        return false;
+    }
+    
+    return true;
+}
+
+function calculateDistance(P1, P2, P) { //计算P点到直线AB的距离
+
+    var PP1 = P1.subtract(P);
+    var PP2 = P2.subtract(P);
+    var P1P2= P2.subtract(P1);
+
+    return Math.abs(0.5 * PP1.cross(PP2)/boxSize);
+}
+
+function sphereContactWithBorder(sphere,box) {
+
+
+    var P = new Vector2(sphere.x, sphere.y);
+    var OP= P.subtract(box.attribute.O);
+    var nextDis = Math.sqrt(sphere.cx * sphere.cx + sphere.cy * sphere.cy) ;
+
+    if(OP.dot(box.attribute.OA) >= 0 && OP.dot(box.attribute.OB) >= 0) {//1区
+
+
+        if(calculateDistance(box.attribute.A, box.attribute.B, P) <= sphere.r + nextDis-4) {
+            return "horizontal"
+        }
+    }
+    else if(OP.dot(box.attribute.OA) >= 0 && OP.dot(box.attribute.OD) >= 0) {
+
+
+        if(calculateDistance(box.attribute.A, box.attribute.D, P) <= sphere.r + nextDis-6) {
+            return "vertical"
+        }
+    }
+    else if(OP.dot(box.attribute.OD) >= 0 && OP.dot(box.attribute.OC) >= 0) {
+
+
+        if(calculateDistance(box.attribute.C, box.attribute.D, P) <= sphere.r + nextDis-6) {
+            return "horizontal"
+        }
+    }
+    else if(OP.dot(box.attribute.OB) >= 0 && OP.dot(box.attribute.OC) >= 0) {
+
+
+        if(calculateDistance(box.attribute.B, box.attribute.C, P) <= sphere.r + nextDis-6) {
+            return "vertical"
+        }
+    }
+    
+    else {
+
+        alert(OP.dot(box.attribute.OA)+"/"+OP.dot(box.attribute.OD))
+
+        return null;
+    }
+
+
+}
+
+
+function clearPossibleBorder(i, j, thisControlPoint) {
+
+    thisControlPoint.ifBeBreak = false;
+    if(thisControlPoint.direction == "horizontal") {
+
+        var i1 = i;
+        var i2 = i-1;
+        while(i1<widthNum-1) {
+
+          if(box[i1][j].attribute.border == -1) {
+              box[i1][j].attribute.border = 1;
+              drawBox(box[i1][j],0xDBDBDB,0x66CCFF);
+          }
+          else
+            break;
+          i1++;
+
+        }
+        while(i2 > 0) {
+            if(box[i2][j].attribute.border == -1) {
+                box[i2][j].attribute.border = 1;
+                drawBox(box[i2][j],0xDBDBDB,0x66CCFF);
+
+            }
+            else
+              break;
+            i2--;
+        }
+    }
+
+    
+}
+
+function upDateSpherePosition(sphere,thisControlPoint) {
+
+    var len = sphere.length;
+    var contactType = 0;
+    for(var i = 0; i < len; i++) {
+
+        var j = Math.floor(sphere[i].x / boxSize);
+        var k = Math.floor(sphere[i].y / boxSize);
+
+        if(testIndexOut(j, k-1) && box[j][k-1].attribute.border <= 0) {
+            //alert(sphereContactWithBorder(sphere[i], box[j][k-1]));
+
+            if(contactType = sphereContactWithBorder(sphere[i], box[j][k-1])) {
+                
+                if(box[j][k-1].attribute.border == -1) {
+                    clearPossibleBorder(j, k-1,thisControlPoint);
+                }
+
+            }
+
+        }
+
+        else if(testIndexOut(j, k+1) && box[j][k+1].attribute.border <= 0) {
+            if(contactType = sphereContactWithBorder(sphere[i],box[j][k+1])) {
+                
+                if(box[j][k+1].attribute.border == -1) {
+                    clearPossibleBorder(j, k+1,thisControlPoint);
+                }
+
+            }
+        }
+
+        else if(testIndexOut(j-1, k) && box[j-1][k].attribute.border <= 0) {
+            if(contactType = sphereContactWithBorder(sphere[i],box[j-1][k])) {
+                
+                
+
+                if(box[j-1][k].attribute.border == -1) {
+                    clearPossibleBorder(j-1, k,thisControlPoint);
+                }
+
+            }
+        }
+
+        else if(testIndexOut(j+1, k) && box[j+1][k].attribute.border <= 0) {
+            if(contactType = sphereContactWithBorder(sphere[i],box[j+1][k])) {
+                
+                
+
+                if(box[j+1][k].attribute.border == -1) {
+                    clearPossibleBorder(j+1, k,thisControlPoint);
+                }
+
+            }
+        }
+
+       else if(testIndexOut(j-1, k-1) && box[j-1][k-1].attribute.border <= 0) {
+            if(contactType = sphereContactWithBorder(sphere[i],box[j-1][k-1])) {
+                
+                
+
+                if(box[j-1][k-1].attribute.border == -1) {
+                    clearPossibleBorder(j-1, k-1,thisControlPoint);
+                }
+
+            }
+        }
+
+        else if(testIndexOut(j+1, k-1) && box[j+1][k-1].attribute.border <= 0) {
+            if(contactType = sphereContactWithBorder(sphere[i],box[j+1][k-1])) {
+                
+                
+
+                if(box[j+1][k-1].attribute.border == -1) {
+                    clearPossibleBorder(j+1, k-1,thisControlPoint);
+                }
+
+            }
+        }
+
+        else if(testIndexOut(j-1, k+1) && box[j-1][k+1].attribute.border <= 0) {
+            if(contactType = sphereContactWithBorder(sphere[i],box[j-1][k+1])) {
+                
+                
+
+                if(box[j-1][k+1].attribute.border == -1) {
+                    clearPossibleBorder(j-1, k+1,thisControlPoint);
+                }
+
+            }
+        }
+
+        else if(testIndexOut(j+1, k+1) && box[j+1][k+1].attribute.border <= 0) {
+            if(contactType = sphereContactWithBorder(sphere[i],box[j+1][k+1])) {
+                
+                
+
+                if(box[j+1][k+1].attribute.border == -1) {
+                    clearPossibleBorder(j+1, k+1,thisControlPoint);
+                }
+
+            }
+        }
+
+        else {}
+        if(contactType == "horizontal") {
+            sphere[i].cy *= -1;
+            //alert("horizontal");
+        }
+
+        if(contactType == "vertical") {
+            sphere[i].cx *= -1;
+            //alert("vertical");
+        }
+        
+        sphere[i].x += sphere[i].cx;
+        sphere[i].y += sphere[i].cy;
+        contactType = 0;
+
+    }
+}
+
+var boxMoveSpeed = 0.5;
+var controlPointState = 1;
+
+function render() {
+
+    if(thisControlPoint) {
+
+        thisControlPoint.P1.x -= boxMoveSpeed;
+        thisControlPoint.P2.x += boxMoveSpeed;
+        var i1 = Math.floor(thisControlPoint.P1.x);
+        var i2 = Math.floor(thisControlPoint.P2.x);
+        var y  = thisControlPoint.P1.y;
+        
+        if(i1 > 0 && box[i1][y].attribute.border == 1 && thisControlPoint.ifBeBreak) {
+
+            box[i1][y].beginFill(0xFFFFFF); 
+            box[i1][y].drawRect(0, 0, boxSize, boxSize);
+            box[i1][y].endFill();
+            box[i1][y].attribute.border = -1;//可能成为边界
+
+            if(box[i1-1][y].attribute.border == 0) {
+
+                  for(var i = i1; i <= thisControlPoint.position.x; i++) {
+
+                      box[i][y].lineStyle(2, 0x000000, 1);
+                      box[i][y].beginFill(0x000000); 
+                      box[i][y].drawRect(0, 0, boxSize, boxSize);
+                      box[i][y].endFill();
+                      box[i][y].attribute.border = 0;
+
+                  }
+
+            }
+
+        }
+            
+        if(i2 < widthNum - 1 && box[i2][y].attribute.border == 1 &&thisControlPoint.ifBeBreak) {
+            
+            box[i2][y].beginFill(0xFFFFFF); 
+            box[i2][y].drawRect(0, 0, boxSize, boxSize);
+            box[i2][y].endFill();
+            box[i2][y].attribute.border = -1;//可能成为边界
+
+             if(box[i2+1][y].attribute.border == 0) {
+
+                  for(var i = i2; i >= thisControlPoint.position.x; i--) {
+
+                      box[i][y].lineStyle(2, 0x000000, 1);
+                      box[i][y].beginFill(0x000000); 
+                      box[i][y].drawRect(0, 0, boxSize, boxSize);
+                      box[i][y].endFill();
+                      box[i][y].attribute.border = 0;
+
+                  }
+
+            }
+
+        }
+
+
+
+        if(i1 <= 0 && i2 >= widthNum -1) {
+            controlPointState = 1;
+            thisControlPoint  = 0;
+        }
+       
+    }
+
+    upDateSpherePosition(sphere,thisControlPoint);
+
+    requestAnimationFrame(render);
+
+}
+
+var thisControlPoint = 0;
+
+initBox(boxSize, box);
+initBoxGraphics(boxGraphics);
+
+var sphereNum = 3;
+
+for(var i = 0; i < sphereNum; i++) {
+
+    createSphere();
+
+}
+
+createOriginalBorder(box);
+
+render();
+
+
+
+
+document.onmousedown=function (ev){
+
+   var Event=ev||event; 
+   
+   if(Event.button == 0){
+
+     var y = Math.floor(Event.clientY/boxSize);
+     var x = Math.floor(Event.clientX/boxSize);
+     
+     if(controlPointState) {
+
+        thisControlPoint = new controlPoint();
+        thisControlPoint.position = new Vector2(x, y);
+        thisControlPoint.P1 = new Vector2(x, y);
+        thisControlPoint.P2 = new Vector2(x, y);
+
+     }
+
+     controlPointState = 0;
+
+   }
+
+
+   if(Event.button == 2){
+
+     var y = Math.floor(Event.clientY/boxSize);
+     var x = Math.floor(Event.clientX/boxSize);
+
+   }
+
+}
+
+app.renderer.view.style.position = "absolute";
+app.renderer.view.style.display = "block";
+app.renderer.autoResize = true;
+app.renderer.resize(window.innerWidth, window.innerHeight);
+
+document.oncontextmenu = function(){//禁止鼠标右键弹出菜单
+    return false;
+    }
+
+document.addEventListener('touchstart', function() {
+        document.getElementById('audios').play()
+        
+    });
+
+
+
+
+   
+  </script>
+</body>
+</html>
